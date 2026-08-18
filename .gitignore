@@ -1,0 +1,16 @@
+# Секреты и конфигурация
+.env
+*.pem
+*.key
+
+# Python / Виртуальное окружение
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+
+# IDE и ОС
+.idea/
+.vscode/
+.DS_Store
