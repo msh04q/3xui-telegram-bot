@@ -1,16 +1,54 @@
-# Секреты и конфигурация
-.env
-*.pem
-*.key
-
-# Python / Виртуальное окружение
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
+env/
 venv/
 .venv/
+ENV/
+dist/
+build/
+*.egg-info/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
 
-# IDE и ОС
-.idea/
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+*.tfvars
+terraform.tfvars
+
+# Docker
+.dockerignore
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+*.p12
+
+# IDE
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
+
+# OS
+Thumbs.db
+desktop.ini
+
+# Project specific
+/opt/3xui-bot/
+infrastructure/ansible/playbook.yml
