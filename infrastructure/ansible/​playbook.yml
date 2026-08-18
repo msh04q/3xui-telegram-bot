@@ -1,131 +1,55 @@
 ---
-- name: Full Provisioning of VPN Node, Camouflage Site & Telegram Bot
+- name: Deploy VPN & Monitoring via Docker Compose
   hosts: vpn_nodes
   become: true
   vars:
-    bot_dir: "/opt/3xui-bot"
+    project_dir: "/opt/3xui-bot"
     repo_url: "https://github.com/your-username/3xui-telegram-bot.git"
 
   tasks:
-    - name: Update APT cache & install system dependencies
+    - name: Install Docker & Dependencies
       apt:
         update_cache: yes
-        name: [git, curl, python3, python3-venv, python3-pip, ufw, sqlite3, nginx]
+        name:
+          - git
+          - curl
+          - ufw
+          - docker.io
+          - docker-compose-v2
         state: present
 
-    - name: Configure UFW Security Rules
+    - name: Ensure Docker service is active
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Configure UFW Rules
       ufw:
         rule: allow
         port: "{{ item }}"
         proto: tcp
-      loop: ['22', '80', '443', '2096']
+      loop: ['22', '80', '443', '2096', '3000'] # 3000 для доступа к Grafana
 
-    - name: Enable UFW Firewall
+    - name: Enable UFW
       ufw:
         state: enabled
 
-    - name: Create Camouflage Web Directory
-      file:
-        path: /var/www/html
-        state: directory
-        mode: '0755'
-
-    - name: Deploy Camouflage Site HTML
-      copy:
-        dest: /var/www/html/index.html
-        content: |
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>CDN Edge Node - Operational</title>
-              <style>
-                  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-                  .card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 2rem; max-width: 400px; text-align: center; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); }
-                  .status { display: inline-block; width: 10px; height: 10px; background: #22c55e; border-radius: 50%; margin-right: 8px; }
-                  h1 { font-size: 1.25rem; margin-bottom: 0.5rem; font-weight: 600; }
-                  p { color: #94a3b8; font-size: 0.875rem; margin: 0; }
-              </style>
-          </head>
-          <body>
-              <div class="card">
-                  <h1><span class="status"></span>Edge Routing Node</h1>
-                  <p>Status: Active | Latency: Normal | Region: EU-Central</p>
-              </div>
-          </body>
-          </html>
-
-    - name: Configure Nginx Camouflage Site (Port 8080)
-      copy:
-        dest: /etc/nginx/sites-available/default
-        content: |
-          server {
-              listen 80 default_server;
-              listen 127.0.0.1:8080 default_server;
-              
-              server_name _;
-              root /var/www/html;
-              index index.html;
-
-              location / {
-                  try_files $uri $uri/ =404;
-              }
-          }
-      notify: Reload Nginx
-
-    - name: Install 3X-UI Panel
+    - name: Install 3X-UI Panel natively (Host network)
       shell: |
         curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh | bash -s -- -y
       args:
         creates: /usr/local/x-ui/x-ui
 
-    - name: Clone Bot Repository
+    - name: Clone Project Repository
       git:
         repo: "{{ repo_url }}"
-        dest: "{{ bot_dir }}"
+        dest: "{{ project_dir }}"
         version: main
         force: yes
 
-    - name: Setup Python Virtual environment
-      command:
-        cmd: python3 -m venv venv
-        creates: "{{ bot_dir }}/venv"
-        chdir: "{{ bot_dir }}"
-
-    - name: Install Python Dependencies
-      pip:
-        requirements: "{{ bot_dir }}/requirements.txt"
-        virtualenv: "{{ bot_dir }}/venv"
-
-    - name: Create Systemd Unit for Bot
-      copy:
-        dest: /etc/systemd/system/3xui-bot.service
-        content: |
-          [Unit]
-          Description=3X-UI Telegram Bot Service
-          After=network.target x-ui.service
-
-          [Service]
-          Type=simple
-          User=root
-          WorkingDirectory={{ bot_dir }}
-          ExecStart={{ bot_dir }}/venv/bin/python main.py
-          Restart=always
-          RestartSec=5
-
-          [Install]
-          WantedBy=multi-user.target
-
-    - name: Enable & Start Bot Service
-      systemd:
-        name: 3xui-bot
-        daemon_reload: yes
-        enabled: yes
-        state: started
-
-  handlers:
-    - name: Reload Nginx
-      service:
-        name: nginx
-        state: reloaded
+    - name: Run Docker Compose Stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ project_dir }}"
+        state: present
+        build: always
